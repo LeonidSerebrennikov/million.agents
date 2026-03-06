@@ -1,0 +1,54 @@
+CREATE TYPE task_priority AS ENUM ('low', 'medium', 'high', 'critical');
+CREATE TYPE task_status AS ENUM ('created', 'in_progress', 'review', 'done', 'cancelled');
+
+CREATE TABLE users (
+    id BIGSERIAL PRIMARY KEY
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE projects (
+    id BIGSERIAL PRIMARY KEY
+    owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE project_members (
+    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    PRIMARY KEY (project_id, user_id) 
+);
+
+CREATE TABLE tasks (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(500) NOT NULL,
+    description TEXT,
+    priority task_priority NOT NULL DEFAULT 'medium',
+    status task_status NOT NULL DEFAULT 'created',
+    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    executor_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE task_log (
+    id BIGSERIAL PRIMARY KEY,
+    task_id BIGINT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, -- Если задача удалена, история не нужна
+    changed_by BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT, -- Кто изменил
+    from_status task_status NOT NULL, -- Было
+    to_status task_status NOT NULL,   -- Стало
+    changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_tasks_project_id ON tasks(project_id);
+CREATE INDEX idx_tasks_executor_id ON tasks(assignee_id);
+CREATE INDEX idx_tasks_status ON tasks(status);
+CREATE INDEX idx_tasks_priority ON tasks(priority);
+
+CREATE INDEX idx_log_task_id ON task_log(task_id);
+CREATE INDEX idx_task_log_changed_at ON task_log(changed_at DESC);
+
+CREATE INDEX idx_project_members_user_id ON project_members(user_id);
+CREATE INDEX idx_projects_owner_id ON projects(owner_id);
